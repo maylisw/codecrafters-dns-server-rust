@@ -1,4 +1,4 @@
-//////////// MACROS ////////////
+//////////// FROM MACROS ////////////
 
 macro_rules! be_u8s_to_u16 {
     ($x:expr) => {
@@ -51,5 +51,24 @@ macro_rules! extract_reserved {
 macro_rules! extract_rcode {
     ($x:expr) => {
         ($x & 0b1111)
+    };
+}
+
+//////////// TO MACROS ////////////
+macro_rules! le_u16_to_u8s {
+    ($x:expr) => {
+        (($x >> 8) as u8, ($x as u8))
+    };
+}
+
+macro_rules! pack_qr_opcode_aa_tc_rd {
+    ($u:expr,$w:expr,$x:expr,$y:expr,$z:expr) => {
+        ((($u as u8) << 7) | ($w << 3) | ($x as u8) << 2 | ($y as u8) << 1 | ($z as u8))
+    };
+}
+
+macro_rules! pack_ra_reserved_rcode {
+    ($x:expr,$y:expr,$z:expr) => {
+        ((($x as u8) << 7) | ($y << 4) | $z)
     };
 }

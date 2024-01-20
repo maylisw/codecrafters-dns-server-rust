@@ -64,6 +64,13 @@ impl Packet {
             ));
         }
 
+        (buf[0], buf[1]) = le_u16_to_u8s!(self.id);
+		buf[2] = pack_qr_opcode_aa_tc_rd!(self.resp, self.opcode, self.authoratitive, self.truncated, self.recurse);
+        buf[3] = pack_ra_reserved_rcode!(self.recursion_avaliable, self.reserved, self.rcode);
+        (buf[4], buf[5]) = le_u16_to_u8s!(self.question_count);
+        (buf[6], buf[7]) = le_u16_to_u8s!(self.answer_count);
+        (buf[8], buf[9]) = le_u16_to_u8s!(self.ns_count);
+        (buf[10], buf[11]) = le_u16_to_u8s!(self.additional_count);
         return Ok(());
     }
 
