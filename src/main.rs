@@ -13,12 +13,26 @@ fn main() {
         match udp_socket.recv_from(&mut buf) {
             Ok((size, source)) => {
                 println!("Received {} bytes from {}", size, source);
-                println!("Recieved packet: {:#?}", packet::Packet::from(&buf));
 
+                let query = match packet::Packet::from_buf(&buf) {
+                    Ok(query) => query,
+                    Err(err) => panic!("error in Packet::from_buf {}", err),
+                };
+                println!("Recieved packet: {:#?}", query);
 
-                let response = [];
+                let response = match query.get_response() {
+                    Ok(response) => response,
+                    Err(err) => panic!("error in Packet::get_response {}", err),
+                };
+                println!("Responding with packet: {:#?}", response);
+
+                match response.into_buf(&mut buf) {
+                    Ok(()) => (),
+                    Err(err) => panic!("error in Packet::into_buf {}", err),
+                };
+
                 udp_socket
-                    .send_to(&response, source)
+                    .send_to(&buf, source)
                     .expect("Failed to send response");
             }
             Err(e) => {

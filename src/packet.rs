@@ -1,77 +1,12 @@
 use std::fmt;
 
-/*
-HEADER
-    id: 16 bits
-    qr: 1 bit
-    opcode: 4 bits
-    aa: 1 bit
-    tc: 1 bit
-    rd: 1 bit
-    ra: 1 bit
-    reserved: 3 bits
-    rcode: 4 bits
-    qdcount: 16 bits
-    ancount: 16 bits
-    nscount: 16 bits
-    arcount: 16 bits
-*/
+#[macro_use]
+mod macros;
 
-macro_rules! be_u8s_to_u16 {
-    ($x:expr) => {
-        (($x[0] as u16) << 8 | ($x[1] as u16))
-    };
-}
+#[cfg(test)]
+mod tests;
 
-macro_rules! extract_resp {
-    ($x:expr) => {
-        ($x & 1 << 7) != 0
-    };
-}
-
-macro_rules! extract_opcode {
-    ($x:expr) => {
-        ($x & 0b1111 << 3) >> 3
-    };
-}
-
-macro_rules! extract_authoratitive {
-    ($x:expr) => {
-        ($x & 1 << 2) != 0
-    };
-}
-
-macro_rules! extract_truncated {
-    ($x:expr) => {
-        ($x & 1 << 1) != 0
-    };
-}
-
-macro_rules! extract_recurse {
-    ($x:expr) => {
-        ($x & 1) != 0
-    };
-}
-
-macro_rules! extract_recursion_avaliable {
-    ($x:expr) => {
-        ($x & 1 << 7) != 0
-    };
-}
-
-macro_rules! extract_reserved {
-    ($x:expr) => {
-        ($x & 0b111 << 4) >> 4
-    };
-}
-
-macro_rules! extract_rcode {
-    ($x:expr) => {
-        ($x & 0b1111)
-    };
-}
-
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Packet {
     id: u16,
     resp: bool,
@@ -96,11 +31,7 @@ impl fmt::Display for Packet {
 }
 
 impl Packet {
-    pub fn packet_id(&self) -> u16 {
-        return self.id;
-    }
-
-    pub fn from(buf: &[u8]) -> Result<Packet, String> {
+    pub fn from_buf(buf: &[u8]) -> Result<Packet, String> {
         if buf.len() != 512 {
             return Err(format!(
                 "Invalid Argument: length is {}, must be 512",
@@ -122,6 +53,35 @@ impl Packet {
             answer_count: be_u8s_to_u16!(&buf[6..8]),
             ns_count: be_u8s_to_u16!(&buf[8..10]),
             additional_count: be_u8s_to_u16!(&buf[10..12]),
+        });
+    }
+
+    pub fn into_buf(&self, buf: &mut [u8]) -> Result<(), String> {
+        if buf.len() != 512 {
+            return Err(format!(
+                "Invalid Argument: length is {}, must be 512",
+                buf.len()
+            ));
+        }
+
+        return Ok(());
+    }
+
+    pub fn get_response(&self) -> Result<Packet, String> {
+        return Ok(Packet {
+            id: self.id,
+            resp: true,
+            opcode: 0,
+            authoratitive: false,
+            truncated: false,
+            recurse: false,
+            recursion_avaliable: false,
+            reserved: 0,
+            rcode: 0,
+            question_count: 0,
+            answer_count: 0,
+            ns_count: 0,
+            additional_count: 0,
         });
     }
 }
