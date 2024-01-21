@@ -16,27 +16,36 @@ fn main() {
 
                 let query = match packet::Packet::from_buf(&buf) {
                     Ok(query) => query,
-                    Err(err) => panic!("error in Packet::from_buf {}", err),
+                    Err(err) => {
+                        eprintln!("error in Packet::from_buf: {}", err);
+                        continue;
+                    }
                 };
                 println!("Recieved packet: {:#?}", query);
 
                 let response = match query.get_response() {
                     Ok(response) => response,
-                    Err(err) => panic!("error in Packet::get_response {}", err),
+                    Err(err) => {
+                        eprintln!("error in Packet::get_response: {}", err);
+                        continue;
+                    }
                 };
                 println!("Responding with packet: {:#?}", response);
 
-                match response.into_buf(&mut buf) {
+                match response.to_buf(&mut buf) {
                     Ok(()) => (),
-                    Err(err) => panic!("error in Packet::into_buf {}", err),
+                    Err(err) => {
+                        eprintln!("error in Packet::into_buf: {}", err);
+                        continue;
+                    }
                 };
 
                 udp_socket
                     .send_to(&buf, source)
-                    .expect("Failed to send response");
+                    .expect("failed to send response");
             }
             Err(e) => {
-                eprintln!("Error receiving data: {}", e);
+                eprintln!("error receiving data: {}", e);
                 break;
             }
         }
