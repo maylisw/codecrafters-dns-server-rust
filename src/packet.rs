@@ -312,7 +312,7 @@ impl Packet {
         };
 
         index = Question::to_buf(self.questions, index, &mut buf[0..]);
-        index += Answer::to_buf(self.answers, &mut buf[index..]);
+        Answer::to_buf(self.answers, &mut buf[index..]);
 
         return Ok(());
     }
