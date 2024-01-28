@@ -233,16 +233,20 @@ impl Packet {
     }
 
     pub fn get_response(self) -> Result<Packet, String> {
+        let rcode = match self.header.opcode {
+            0 => 0,
+            _ => 4,
+        };
         let header = Header {
             id: self.header.id,
             resp: true,
-            opcode: 0,
+            opcode: self.header.opcode,
             authoratitive: false,
             truncated: false,
-            recurse: false,
+            recurse: self.header.recurse,
             recursion_avaliable: false,
             reserved: 0,
-            rcode: 0,
+            rcode: rcode,
             question_count: self.header.question_count,
             answer_count: 1,
             ns_count: 0,
