@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 #[macro_use]
 mod macros;
 
@@ -80,26 +82,50 @@ struct Question {
 }
 
 impl Question {
-    fn from_buf(buf: &[u8], num_questions: u16) -> Result<Vec<Question>, String> {
-        let mut index = 0;
-
+    fn from_buf(
+        buf: &[u8],
+        start_index: usize,
+        num_questions: u16,
+    ) -> Result<Vec<Question>, String> {
+        let mut index = start_index;
+        // Maps an index in the buffer to the index of the question and name associated w/
+        // that index in the buffer as such:
+        // {index in buf : (index of question, index of name)}
+        let mut index_to_question_name = HashMap::<usize, (usize, usize)>::new();
         let mut questions = Vec::<Question>::new();
 
         for _i in 0..num_questions {
             let mut names = Vec::<String>::new();
             loop {
-                let len = buf[index] as usize;
+                let len: usize = buf[index] as usize;
                 index += 1;
                 if len == 0 {
                     break;
                 }
+                if compressed!(len) {
+                    let buf_idx = get_compressed_index!(len, buf[index]) as usize;
+                    index += 1;
 
-                let value = match String::from_utf8(buf[index..index + len].to_vec()) {
-                    Ok(value) => value,
-                    Err(err) => return Err(format!("error in String::from_utf8: {}", err)),
-                };
-                names.push(value);
-                index += len;
+                    let (q_idx, n_idx) = match index_to_question_name.get(&buf_idx) {
+                        Some((q_idx, n_idx)) => (q_idx, n_idx),
+                        None => {
+                            return Err(format!(
+                                "compressed index: {}, not in index_to_question_name",
+                                buf_idx
+                            ))
+                        }
+                    };
+                    let names_sub = questions[*q_idx].names[*n_idx..].to_vec().clone();
+                    names.extend(names_sub);
+                } else {
+                    index_to_question_name.insert(index - 1, (questions.len(), names.len()));
+                    let value = match String::from_utf8(buf[index..index + len].to_vec()) {
+                        Ok(value) => value,
+                        Err(err) => return Err(format!("error in String::from_utf8: {}", err)),
+                    };
+                    names.push(value);
+                    index += len;
+                }
             }
 
             questions.push(Question {
@@ -114,8 +140,8 @@ impl Question {
         return Ok(questions);
     }
 
-    fn to_buf(questions: Vec<Question>, buf: &mut [u8]) -> usize {
-        let mut index = 0;
+    fn to_buf(questions: Vec<Question>, start_index: usize, buf: &mut [u8]) -> usize {
+        let mut index = start_index;
         for question in questions {
             for name in question.names {
                 buf[index] = name.len() as u8;
@@ -199,7 +225,7 @@ impl Packet {
             Err(error) => return Err(format!("error in Header::from_buf: {}", error)),
         };
 
-        let questions = match Question::from_buf(&buf[12..], header.question_count) {
+        let questions = match Question::from_buf(&buf[0..], 12, header.question_count) {
             Ok(value) => value,
             Err(error) => return Err(format!("error in Packet::from_buf: {}", error)),
         };
@@ -226,7 +252,7 @@ impl Packet {
             Err(err) => return Err(format!("error in Header::to_buf: {}", err)),
         };
 
-        index += Question::to_buf(self.questions, &mut buf[index..]);
+        index = Question::to_buf(self.questions, index, &mut buf[0..]);
         index += Answer::to_buf(self.answers, &mut buf[index..]);
 
         return Ok(());

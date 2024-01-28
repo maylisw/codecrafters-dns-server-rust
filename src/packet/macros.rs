@@ -72,3 +72,17 @@ macro_rules! pack_ra_reserved_rcode {
         ((($x as u8) << 7) | ($y << 4) | $z)
     };
 }
+
+//////////// COMPRESSION MACROS ////////////
+
+macro_rules! compressed {
+    ($x:expr) => {
+        ((($x as u8) & 0b11 << 6) == 0b11 << 6)
+    };
+}
+
+macro_rules! get_compressed_index {
+    ($x:expr, $y:expr) => {
+        ((($x as u16) & (0b00 << 6)) << 8 | $y as u16)
+    };
+}
