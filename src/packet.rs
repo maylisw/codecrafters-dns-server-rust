@@ -252,7 +252,7 @@ impl Packet {
             ns_count: 0,
             additional_count: 0,
         };
-
+        // Yeet
         let answer = Answer {
             names: self.questions[0].names.clone(),
             a_type: 1,
