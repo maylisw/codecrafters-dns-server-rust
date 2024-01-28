@@ -4,13 +4,6 @@ mod macros;
 #[cfg(test)]
 mod tests;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-struct Question {
-    names: Vec<String>,
-    q_type: u16,
-    class: u16,
-}
-
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 struct Header {
     id: u16,
@@ -77,58 +70,17 @@ impl Header {
         (buf[10], buf[11]) = le_u16_to_u8s!(self.additional_count);
         return Ok(());
     }
-
-    pub fn get_response(self) -> Header {
-        return Header {
-            id: self.id,
-            resp: true,
-            opcode: 0,
-            authoratitive: false,
-            truncated: false,
-            recurse: false,
-            recursion_avaliable: false,
-            reserved: 0,
-            rcode: 0,
-            question_count: self.question_count,
-            answer_count: 0,
-            ns_count: 0,
-            additional_count: 0,
-        };
-    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Packet {
-    header: Header,
-    questions: Vec<Question>,
+struct Question {
+    names: Vec<String>,
+    q_type: u16,
+    class: u16,
 }
 
-impl Packet {
-    pub fn from_buf(buf: &[u8]) -> Result<Packet, String> {
-        if buf.len() != 512 {
-            return Err(format!(
-                "Invalid Argument: length is {}, must be 512",
-                buf.len()
-            ));
-        }
-
-        let header = match Header::from_buf(&buf[0..12]) {
-            Ok(value) => value,
-            Err(error) => return Err(format!("error in Header::from_buf: {}", error)),
-        };
-
-        let questions = match Packet::parse_questions(&buf[12..], header.question_count) {
-            Ok(value) => value,
-            Err(error) => return Err(format!("error in Packet::parse_questions: {}", error)),
-        };
-
-        return Ok(Packet {
-            header: header,
-            questions: questions,
-        });
-    }
-
-    fn parse_questions(buf: &[u8], num_questions: u16) -> Result<Vec<Question>, String> {
+impl Question {
+    fn from_buf(buf: &[u8], num_questions: u16) -> Result<Vec<Question>, String> {
         let mut index = 0;
 
         let mut questions = Vec::<Question>::new();
@@ -162,21 +114,9 @@ impl Packet {
         return Ok(questions);
     }
 
-    pub fn to_buf(self, buf: &mut [u8]) -> Result<(), String> {
-        if buf.len() != 512 {
-            return Err(format!(
-                "Invalid Argument: length is {}, must be 512",
-                buf.len()
-            ));
-        }
-
-        match self.header.to_buf(&mut buf[0..12]) {
-            Ok(()) => (),
-            Err(err) => return Err(format!("error in Header::to_buf: {}", err)),
-        };
-
-        let mut index = 12;
-        for question in self.questions {
+    fn to_buf(questions: Vec<Question>, buf: &mut [u8]) -> usize {
+        let mut index = 0;
+        for question in questions {
             for name in question.names {
                 buf[index] = name.len() as u8;
                 index += 1;
@@ -193,14 +133,134 @@ impl Packet {
             (buf[index], buf[index + 1]) = le_u16_to_u8s!(question.class);
             index += 2;
         }
+        return index;
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+struct Answer {
+    names: Vec<String>,
+    a_type: u16,
+    class: u16,
+    ttl: u32,
+    len: u16,
+    data: [u8; 4],
+}
+
+impl Answer {
+    pub fn to_buf(answers: Vec<Answer>, buf: &mut [u8]) -> usize {
+        let mut index = 0;
+        for answer in answers {
+            for name in answer.names {
+                buf[index] = name.len() as u8;
+                index += 1;
+                for b in name.into_bytes() {
+                    buf[index] = b;
+                    index += 1;
+                }
+            }
+            buf[index] = 0;
+            index += 1;
+
+            (buf[index], buf[index + 1]) = le_u16_to_u8s!(answer.a_type);
+            index += 2;
+            (buf[index], buf[index + 1]) = le_u16_to_u8s!(answer.class);
+            index += 2;
+
+            buf[index..index + 4].clone_from_slice(&answer.ttl.to_be_bytes());
+            index += 4;
+            buf[index..index + 2].clone_from_slice(&answer.len.to_be_bytes());
+            index += 2;
+            buf[index..index + answer.len as usize].clone_from_slice(&answer.data);
+            index += answer.len as usize;
+        }
+        return index;
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Packet {
+    header: Header,
+    questions: Vec<Question>,
+    answers: Vec<Answer>,
+}
+
+impl Packet {
+    pub fn from_buf(buf: &[u8]) -> Result<Packet, String> {
+        if buf.len() != 512 {
+            return Err(format!(
+                "Invalid Argument: length is {}, must be 512",
+                buf.len()
+            ));
+        }
+
+        let header = match Header::from_buf(&buf[0..12]) {
+            Ok(value) => value,
+            Err(error) => return Err(format!("error in Header::from_buf: {}", error)),
+        };
+
+        let questions = match Question::from_buf(&buf[12..], header.question_count) {
+            Ok(value) => value,
+            Err(error) => return Err(format!("error in Packet::from_buf: {}", error)),
+        };
+
+        return Ok(Packet {
+            header: header,
+            questions: questions,
+            answers: vec![], //Todo: actually read the answers
+        });
+    }
+
+    pub fn to_buf(self, buf: &mut [u8]) -> Result<(), String> {
+        if buf.len() != 512 {
+            return Err(format!(
+                "Invalid Argument: length is {}, must be 512",
+                buf.len()
+            ));
+        }
+        // Header is fixed at 12 bytes
+        let mut index = 12;
+
+        match self.header.to_buf(&mut buf[0..index]) {
+            Ok(()) => (),
+            Err(err) => return Err(format!("error in Header::to_buf: {}", err)),
+        };
+
+        index += Question::to_buf(self.questions, &mut buf[index..]);
+        index += Answer::to_buf(self.answers, &mut buf[index..]);
 
         return Ok(());
     }
 
     pub fn get_response(self) -> Result<Packet, String> {
+        let header = Header {
+            id: self.header.id,
+            resp: true,
+            opcode: 0,
+            authoratitive: false,
+            truncated: false,
+            recurse: false,
+            recursion_avaliable: false,
+            reserved: 0,
+            rcode: 0,
+            question_count: self.header.question_count,
+            answer_count: 1,
+            ns_count: 0,
+            additional_count: 0,
+        };
+
+        let answer = Answer {
+            names: self.questions[0].names.clone(),
+            a_type: 1,
+            class: 1,
+            ttl: 60,
+            len: 4,
+            data: [127, 0, 0, 1],
+        };
         return Ok(Packet {
-            header: self.header.get_response(),
+            header: header,
             questions: self.questions,
+            answers: vec![answer],
         });
     }
 }

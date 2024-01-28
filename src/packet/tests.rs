@@ -1,3 +1,5 @@
+use std::vec;
+
 use super::*;
 #[test]
 fn test_to_from_header() {
@@ -48,6 +50,7 @@ fn test_to_from_packet() {
             q_type: 1,
             class: 1,
         }],
+        answers: vec![],
     };
     let packet = my_packet.clone();
 
