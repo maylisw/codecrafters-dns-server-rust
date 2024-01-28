@@ -365,14 +365,10 @@ impl Packet {
             // RECIEVE PACKET
 
             let result = match socket.recv_from(&mut my_q) {
-                Ok((size, source)) => {
-                    println!("Received {} bytes from {}", size, source);
-
-                    match Packet::from_buf(&my_q) {
-                        Ok(answer) => answer,
-                        Err(err) => return Err(format!("error in Packet::from_buf: {}", err)),
-                    }
-                }
+                Ok((_, _)) => match Packet::from_buf(&my_q) {
+                    Ok(answer) => answer,
+                    Err(err) => return Err(format!("error in Packet::from_buf: {}", err)),
+                },
                 Err(e) => return Err(format!("error receiving data: {}", e)),
             };
 

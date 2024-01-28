@@ -18,9 +18,7 @@ fn main() {
 
     loop {
         match udp_socket.recv_from(&mut buf) {
-            Ok((size, source)) => {
-                println!("Received {} bytes from {}", size, source);
-
+            Ok((_, source)) => {
                 let query = match packet::Packet::from_buf(&buf) {
                     Ok(query) => query,
                     Err(err) => {
@@ -28,7 +26,6 @@ fn main() {
                         continue;
                     }
                 };
-                println!("Recieved packet: {:#?}", query);
 
                 let response = match query.get_response(&udp_socket, &resolver_address) {
                     Ok(response) => response,
@@ -37,8 +34,6 @@ fn main() {
                         continue;
                     }
                 };
-                println!("Responding with packet: {:#?}", response);
-
                 match response.to_buf(&mut buf) {
                     Ok(()) => (),
                     Err(err) => {
