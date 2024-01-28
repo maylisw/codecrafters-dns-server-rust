@@ -130,7 +130,7 @@ impl Question {
 
             questions.push(Question {
                 names: names,
-                q_type: dbg!(be_u8s_to_u16!(&buf[index..index + 2])),
+                q_type: be_u8s_to_u16!(&buf[index..index + 2]),
                 class: be_u8s_to_u16!(&buf[index + 2..index + 4]),
             });
 
@@ -274,23 +274,27 @@ impl Packet {
             reserved: 0,
             rcode: rcode,
             question_count: self.header.question_count,
-            answer_count: 1,
+            answer_count: self.header.question_count,
             ns_count: 0,
             additional_count: 0,
         };
-        // Yeet
-        let answer = Answer {
-            names: self.questions[0].names.clone(),
-            a_type: 1,
-            class: 1,
-            ttl: 60,
-            len: 4,
-            data: [127, 0, 0, 1],
-        };
+
+        let mut answers = Vec::<Answer>::new();
+
+        for q in &self.questions {
+            answers.push(Answer {
+                names: q.names.clone(),
+                a_type: 1,
+                class: 1,
+                ttl: 60,
+                len: 4,
+                data: [127, 0, 0, 1],
+            })
+        }
         return Ok(Packet {
             header: header,
             questions: self.questions,
-            answers: vec![answer],
+            answers: answers,
         });
     }
 }
