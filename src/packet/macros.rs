@@ -6,6 +6,12 @@ macro_rules! be_u8s_to_u16 {
     };
 }
 
+macro_rules! be_u8s_to_u32 {
+    ($x:expr) => {
+        (($x[0] as u32) << 24 | ($x[1] as u32) << 16 | ($x[2] as u32) << 8 | ($x[3] as u32))
+    };
+}
+
 macro_rules! extract_resp {
     ($x:expr) => {
         ($x & 1 << 7) != 0

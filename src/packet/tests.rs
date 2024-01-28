@@ -38,7 +38,7 @@ fn test_to_from_packet() {
         reserved: 7,
         rcode: 15,
         question_count: 1,
-        answer_count: 357,
+        answer_count: 1,
         ns_count: 328,
         additional_count: 421,
     };
@@ -50,7 +50,14 @@ fn test_to_from_packet() {
             q_type: 1,
             class: 1,
         }],
-        answers: vec![],
+        answers: vec![Answer {
+            names: vec![String::from("google"), String::from("com")],
+            a_type: 1,
+            class: 1,
+            ttl: 60,
+            len: 4,
+            data: [127, 0, 0, 1],
+        }],
     };
     let packet = my_packet.clone();
 

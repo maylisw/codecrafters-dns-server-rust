@@ -86,7 +86,7 @@ impl Question {
         buf: &[u8],
         start_index: usize,
         num_questions: u16,
-    ) -> Result<Vec<Question>, String> {
+    ) -> Result<(Vec<Question>, usize), String> {
         let mut index = start_index;
         // Maps an index in the buffer to the index of the question and name associated w/
         // that index in the buffer as such:
@@ -94,7 +94,7 @@ impl Question {
         let mut index_to_question_name = HashMap::<usize, (usize, usize)>::new();
         let mut questions = Vec::<Question>::new();
 
-        for _i in 0..num_questions {
+        for _ in 0..num_questions {
             let mut names = Vec::<String>::new();
             loop {
                 let len: usize = buf[index] as usize;
@@ -137,7 +137,7 @@ impl Question {
             index += 4;
         }
 
-        return Ok(questions);
+        return Ok((questions, index));
     }
 
     fn to_buf(questions: Vec<Question>, start_index: usize, buf: &mut [u8]) -> usize {
@@ -174,7 +174,60 @@ struct Answer {
 }
 
 impl Answer {
-    pub fn to_buf(answers: Vec<Answer>, buf: &mut [u8]) -> usize {
+    fn from_buf(buf: &[u8], start_index: usize, num_answers: u16) -> Result<Vec<Answer>, String> {
+        let mut index = start_index;
+        let mut answers = Vec::<Answer>::new();
+
+        for _ in 0..num_answers {
+            let mut names = Vec::<String>::new();
+            loop {
+                let len: usize = buf[index] as usize;
+                index += 1;
+                if len == 0 {
+                    break;
+                }
+                let value = match String::from_utf8(buf[index..index + len].to_vec()) {
+                    Ok(value) => value,
+                    Err(err) => return Err(format!("error in String::from_utf8: {}", err)),
+                };
+                names.push(value);
+                index += len;
+            }
+            let a_type = be_u8s_to_u16!(&buf[index..index + 2]);
+            index += 2;
+            let class = be_u8s_to_u16!(&buf[index..index + 2]);
+            index += 2;
+            let ttl = be_u8s_to_u32!(&buf[index..index + 4]);
+            index += 4;
+            let a_len = match be_u8s_to_u16!(&buf[index..index + 2]) {
+                4 => 4,
+                l => {
+                    return Err(format!(
+                        "error ip address must be length 4, found length {}",
+                        l
+                    ))
+                }
+            };
+            index += 2;
+            let mut data = [0; 4];
+            data.clone_from_slice(&buf[index..index + 4]);
+            index += 4;
+
+            answers.push(Answer {
+                names: names,
+                a_type: a_type,
+                class: class,
+                ttl: ttl,
+                len: a_len,
+                data: data,
+            });
+            index += 4;
+        }
+
+        return Ok(answers);
+    }
+
+    fn to_buf(answers: Vec<Answer>, buf: &mut [u8]) -> usize {
         let mut index = 0;
         for answer in answers {
             for name in answer.names {
@@ -225,7 +278,12 @@ impl Packet {
             Err(error) => return Err(format!("error in Header::from_buf: {}", error)),
         };
 
-        let questions = match Question::from_buf(&buf[0..], 12, header.question_count) {
+        let (questions, index) = match Question::from_buf(&buf, 12, header.question_count) {
+            Ok(value) => value,
+            Err(error) => return Err(format!("error in Packet::from_buf: {}", error)),
+        };
+
+        let answers = match Answer::from_buf(&buf, index, header.answer_count) {
             Ok(value) => value,
             Err(error) => return Err(format!("error in Packet::from_buf: {}", error)),
         };
@@ -233,7 +291,7 @@ impl Packet {
         return Ok(Packet {
             header: header,
             questions: questions,
-            answers: vec![], //Todo: actually read the answers
+            answers: answers, //Todo: actually read the answers
         });
     }
 
