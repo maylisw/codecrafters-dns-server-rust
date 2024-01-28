@@ -1,9 +1,16 @@
 pub mod packet;
+use std::env;
 
 use std::net::UdpSocket;
 
 fn main() {
     println!("Logs from your program will appear here!");
+
+    if env::args().len() != 3 {
+        panic!("must provide a forwarding resolver")
+    }
+
+    let resolver_address = env::args().last().unwrap();
 
     let udp_socket = UdpSocket::bind("127.0.0.1:2053").expect("Failed to bind to address");
 
@@ -23,7 +30,7 @@ fn main() {
                 };
                 println!("Recieved packet: {:#?}", query);
 
-                let response = match query.get_response() {
+                let response = match query.get_response(&udp_socket, &resolver_address) {
                     Ok(response) => response,
                     Err(err) => {
                         eprintln!("error in Packet::get_response: {}", err);

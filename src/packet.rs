@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::net::UdpSocket;
 
 #[macro_use]
 mod macros;
@@ -316,7 +317,11 @@ impl Packet {
         return Ok(());
     }
 
-    pub fn get_response(self) -> Result<Packet, String> {
+    pub fn get_response(
+        self,
+        socket: &UdpSocket,
+        resolver_address: &String,
+    ) -> Result<Packet, String> {
         let rcode = match self.header.opcode {
             0 => 0,
             _ => 4,
@@ -339,15 +344,43 @@ impl Packet {
 
         let mut answers = Vec::<Answer>::new();
 
-        for q in &self.questions {
-            answers.push(Answer {
-                names: q.names.clone(),
-                a_type: 1,
-                class: 1,
-                ttl: 60,
-                len: 4,
-                data: [127, 0, 0, 1],
-            })
+        for q in self.questions.clone() {
+            let send_packet = Packet {
+                header: self.header.clone(),
+                questions: vec![q],
+                answers: vec![],
+            };
+
+            // SEND PACKET
+
+            let mut my_q = [0; 512];
+            send_packet
+                .to_buf(&mut my_q)
+                .expect("error with send_packet::to_buf()");
+
+            socket
+                .send_to(&my_q, resolver_address)
+                .expect(&format!("failed to send response to {}", resolver_address));
+
+            // RECIEVE PACKET
+
+            let result = match socket.recv_from(&mut my_q) {
+                Ok((size, source)) => {
+                    println!("Received {} bytes from {}", size, source);
+
+                    match Packet::from_buf(&my_q) {
+                        Ok(answer) => answer,
+                        Err(err) => return Err(format!("error in Packet::from_buf: {}", err)),
+                    }
+                }
+                Err(e) => return Err(format!("error receiving data: {}", e)),
+            };
+
+            // STEAL ANSWERS
+
+            for a in result.answers {
+                answers.push(a.to_owned())
+            }
         }
         return Ok(Packet {
             header: header,
